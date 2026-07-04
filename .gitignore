@@ -15,6 +15,12 @@ build/
 .env.*
 !.env.example
 
+# Local runtime data (SQLite holds OAuth tokens)
+data/
+*.sqlite
+*.sqlite3
+*.db
+
 # Logs
 logs/
 *.log
@@ -30,6 +36,7 @@ Thumbs.db
 # IDE
 .idea/
 .vscode/
+.cursor/
 *.swp
 *.swo
 *~
@@ -37,11 +44,6 @@ Thumbs.db
 # Testing
 coverage/
 .nyc_output/
-
-# Database
-*.sqlite
-*.sqlite3
-*.db
 
 # Misc
 .vercel
