@@ -3,7 +3,7 @@
 import { ArrowDownRight, ArrowUpRight, CheckCircle2, Info, TrendingDown } from "lucide-react";
 import type { ForecastResponse, TimelinePoint } from "@/lib/squeeze-data";
 import { gbp } from "@/lib/format";
-import { Panel, SectionLabel, Metric } from "./primitives";
+import { Panel, SectionLabel } from "./primitives";
 import { CashCurve } from "./cash-curve";
 import { AnimatedCurrency } from "./animated-currency";
 import StarBorder from "@/components/StarBorder";
@@ -36,12 +36,12 @@ export function CommandCentre({
               {healed ? (
                 <AnimatedCurrency
                   value={forecast.safeToSpend}
-                  className="font-mono text-5xl font-semibold tabular-nums text-success md:text-6xl"
+                  className="font-mono text-6xl font-semibold tabular-nums text-success md:text-7xl"
                 />
               ) : (
                 <AnimatedCurrency
                   value={forecast.safeToSpend}
-                  className={`font-mono text-5xl font-medium tabular-nums md:text-6xl ${
+                  className={`font-mono text-6xl font-semibold tabular-nums md:text-7xl ${
                     negative ? "text-danger" : "text-foreground"
                   }`}
                 />
@@ -68,25 +68,6 @@ export function CommandCentre({
                 </p>
               </div>
             )}
-
-            <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <Metric label="Bank today" value={gbp(forecast.currentBalance)} />
-              <Metric label="Safety buffer" value={gbp(forecast.buffer)} />
-              <Metric
-                label="Lowest day"
-                value={<span className={healed ? "text-success" : "text-danger"}>{forecast.lowDay}</span>}
-              />
-              <Metric
-                label="Gap"
-                value={
-                  healed ? (
-                    <span className="text-success">Closed</span>
-                  ) : (
-                    <span className="text-danger">{gbp(forecast.gap?.amount ?? 0)}</span>
-                  )
-                }
-              />
-            </div>
 
             {!healed && (
               <StarBorder
@@ -135,7 +116,11 @@ export function CommandCentre({
             value={forecast.unpaidReceivables}
             className="mt-2 block font-mono text-2xl tabular-nums"
           />
-          <p className="mt-1 text-xs text-muted-foreground">Money owed to you across 4 customers</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {healed
+              ? "Gap closed — receivables updated after payment"
+              : "Money owed to you across 4 customers"}
+          </p>
         </Panel>
         <Panel className="p-5">
           <div className="flex items-center gap-2 text-muted-foreground">
@@ -158,7 +143,9 @@ export function CommandCentre({
             className="mt-2 block font-mono text-2xl tabular-nums"
           />
           <p className="mt-1 text-xs text-muted-foreground">
-            Healthy on paper — timing is the problem
+            {healed
+              ? "Cash position restored above your safety buffer"
+              : "Healthy on paper — timing is the problem"}
           </p>
         </Panel>
       </div>

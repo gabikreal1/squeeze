@@ -2,7 +2,7 @@ import "dotenv/config";
 import fs from "fs";
 import path from "path";
 import Database from "better-sqlite3";
-import { Invoice, Contact, XeroClient } from "xero-node";
+import { Invoice, Contact, Phone, XeroClient } from "xero-node";
 import { runMigrations } from "../lib/db/client";
 import { getDemoForecast } from "../lib/forecast";
 import {
@@ -27,31 +27,38 @@ const EXTRA_CONTACTS = [
   "Artisan Prints",
 ] as const;
 
+const DEMO_CONTACT_PHONE = "+447512593720";
+
 const PRIMARY_CONTACTS = [
   {
     name: "Patel Catering",
     personality: "loyal",
     email: "accounts@patelcatering.example",
+    phone: DEMO_CONTACT_PHONE,
   },
   {
     name: "BrightBuild Ltd",
     personality: "ghoster",
     email: "ap@brightbuild.example",
+    phone: DEMO_CONTACT_PHONE,
   },
   {
     name: "Henderson & Co",
     personality: "treasury",
     email: "finance@henderson.example",
+    phone: DEMO_CONTACT_PHONE,
   },
   {
     name: "Newline Studio",
     personality: "slow",
     email: "billing@newline.example",
+    phone: DEMO_CONTACT_PHONE,
   },
   {
     name: "Riverside Hotel",
     personality: "strategic",
     email: "accounts@riversidehotel.example",
+    phone: DEMO_CONTACT_PHONE,
   },
 ] as const;
 
@@ -142,21 +149,31 @@ async function upsertContact(
   tenantId: string,
   name: string,
   email: string,
+  phone: string = DEMO_CONTACT_PHONE,
 ): Promise<Contact> {
   const existing = await findContactByName(xero, tenantId, name);
+  const contactPayload = {
+    name,
+    emailAddress: email,
+    isCustomer: true,
+    isSupplier: name.toLowerCase().includes("supplier") ? true : undefined,
+    phones: [
+      {
+        phoneType: Phone.PhoneTypeEnum.MOBILE,
+        phoneNumber: phone,
+      },
+    ],
+  };
+
   if (existing?.contactID) {
-    return existing;
+    const updated = await xero.accountingApi.updateContact(tenantId, existing.contactID, {
+      contacts: [{ contactID: existing.contactID, ...contactPayload }],
+    });
+    return updated.body.contacts?.[0] ?? existing;
   }
 
   const created = await xero.accountingApi.createContacts(tenantId, {
-    contacts: [
-      {
-        name,
-        emailAddress: email,
-        isCustomer: true,
-        isSupplier: name.includes("supplier") ? true : undefined,
-      },
-    ],
+    contacts: [contactPayload],
   });
 
   return created.body.contacts?.[0] ?? { name };
@@ -174,6 +191,7 @@ async function seedXeroContacts(
       tenantId,
       contact.name,
       contact.email,
+      contact.phone,
     );
     contacts.set(contact.name, saved);
   }

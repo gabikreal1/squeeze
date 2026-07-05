@@ -83,7 +83,7 @@ squeeze/
 ```
 XERO_CLIENT_ID=
 XERO_CLIENT_SECRET=
-XERO_SCOPES=accounting.invoices accounting.payments accounting.contacts accounting.settings accounting.reports.aged.read accounting.attachments offline_access
+XERO_SCOPES=accounting.invoices accounting.payments accounting.contacts accounting.settings offline_access
 XERO_WEBHOOK_KEY=
 LLM_API_KEY=
 TWILIO_ACCOUNT_SID=

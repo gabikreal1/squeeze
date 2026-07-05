@@ -16,6 +16,7 @@ export type InvoiceWithExpectedDate = {
   daysOverdue: number;
   contactHistory: PaidInvoiceHistory[];
   segment: ContactSegment;
+  contactPhone?: string;
   viewed?: boolean;
   ignoredReminders?: number;
   hasOpenDispute?: boolean;

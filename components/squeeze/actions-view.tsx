@@ -4,6 +4,7 @@ import { useState } from "react"
 import {
   ChevronDown,
   Lock,
+  MessageCircle,
   PhoneCall,
   ShieldCheck,
   Sparkles,
@@ -27,11 +28,15 @@ const LADDER = [
 export function ActionsView({
   forecast,
   onApproveCall,
-  callState,
+  callStates,
+  onSendMessage,
+  messageStates,
 }: {
   forecast: ForecastResponse
-  onApproveCall: () => void
-  callState: "idle" | "calling" | "done"
+  onApproveCall: (action: SqueezeAction) => void
+  callStates: Record<string, "idle" | "calling" | "done">
+  onSendMessage: (action: SqueezeAction) => void
+  messageStates: Record<string, "idle" | "sending" | "sent" | "error">
 }) {
   return (
     <div className="space-y-4">
@@ -69,14 +74,16 @@ export function ActionsView({
         </div>
       </Panel>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid items-start gap-4 lg:grid-cols-2">
         {forecast.actions.map((a) => (
           <CustomerCard
             key={a.id}
             action={a}
-            onApproveCall={onApproveCall}
-            callState={a.customer.includes("BrightBuild") ? callState : "idle"}
+            onApproveCall={() => onApproveCall(a)}
+            callState={callStates[a.id] ?? "idle"}
             paymentAmount={forecast.paymentReceived ?? a.invoiceAmount}
+            onSendMessage={onSendMessage}
+            messageState={messageStates[a.id] ?? "idle"}
           />
         ))}
       </div>
@@ -89,14 +96,18 @@ function CustomerCard({
   onApproveCall,
   callState,
   paymentAmount,
+  onSendMessage,
+  messageState,
 }: {
   action: SqueezeAction
   onApproveCall: () => void
   callState: "idle" | "calling" | "done"
   paymentAmount: number
+  onSendMessage: (action: SqueezeAction) => void
+  messageState: "idle" | "sending" | "sent" | "error"
 }) {
   const [open, setOpen] = useState(false)
-  const isCall = action.customer.includes("BrightBuild")
+  const isCall = action.actionLabel === "AI call"
 
   const accentRing =
     action.accent === "danger"
@@ -156,25 +167,27 @@ function CustomerCard({
         </div>
         <p className="mt-1 text-sm font-medium text-foreground">{action.recommendation}</p>
 
-        <div className="mt-4 flex items-center gap-2">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           {isCall ? (
-            <CallButton state={callState} onApprove={onApproveCall} amount={paymentAmount} />
-          ) : action.dontSqueeze ? (
+            <div className="flex flex-col items-start gap-1">
+              <CallButton state={callState} onApprove={onApproveCall} amount={paymentAmount} />
+              {action.contactPhone && (
+                <span className="font-mono text-[10px] text-muted-foreground">→ {action.contactPhone}</span>
+              )}
+            </div>
+          ) : action.messageRung ? (
+            <MessageButton
+              state={messageState}
+              label={action.actionLabel ?? "Send WhatsApp"}
+              phone={action.contactPhone}
+              onSend={() => onSendMessage(action)}
+              soft={Boolean(action.dontSqueeze)}
+            />
+          ) : action.actionLabel ? (
             <button className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-accent">
               <ShieldCheck className="size-4 text-success" /> {action.actionLabel}
             </button>
-          ) : (
-            <button
-              className={cn(
-                "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition hover:opacity-90",
-                action.accent === "lemon"
-                  ? "bg-primary text-primary-foreground"
-                  : "border border-border bg-background text-foreground hover:bg-accent",
-              )}
-            >
-              {action.actionLabel}
-            </button>
-          )}
+          ) : null}
           <button
             onClick={() => setOpen((v) => !v)}
             className="inline-flex items-center gap-1 rounded-full px-3 py-2 text-xs text-muted-foreground transition hover:text-foreground"
@@ -249,5 +262,55 @@ function CallButton({ state, onApprove, amount }: { state: "idle" | "calling" | 
     >
       <PhoneCall className="size-4" /> Approve AI call
     </button>
+  )
+}
+
+function MessageButton({
+  state,
+  label,
+  phone,
+  onSend,
+  soft,
+}: {
+  state: "idle" | "sending" | "sent" | "error"
+  label: string
+  phone?: string
+  onSend: () => void
+  soft?: boolean
+}) {
+  if (state === "sent") {
+    return (
+      <span className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/10 px-4 py-2 text-sm font-semibold text-success">
+        <MessageCircle className="size-4" /> WhatsApp sent
+      </span>
+    )
+  }
+  if (state === "sending") {
+    return (
+      <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">
+        <MessageCircle className="size-4 animate-pulse" /> Sending…
+      </span>
+    )
+  }
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <button
+        type="button"
+        onClick={onSend}
+        disabled={state === "error" || !phone}
+        title={phone ? undefined : "Add a mobile number to this contact in Xero"}
+        className={cn(
+          "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition hover:opacity-90 disabled:opacity-50",
+          soft
+            ? "border border-success/30 bg-success/10 text-success"
+            : "bg-primary text-primary-foreground",
+        )}
+      >
+        <MessageCircle className="size-4" /> {label}
+      </button>
+      {phone && (
+        <span className="font-mono text-[10px] text-muted-foreground">→ {phone}</span>
+      )}
+    </div>
   )
 }

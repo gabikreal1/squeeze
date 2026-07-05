@@ -1,24 +1,46 @@
 "use client"
 
-import { useState, type ReactNode } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { Check, Lock, X } from "lucide-react"
-import { scenarios, type Scenario } from "@/lib/squeeze-data"
-import { gbp, pct } from "@/lib/format"
+import type { ForecastResponse, Scenario } from "@/lib/squeeze-data"
+import {
+  buildScenariosFromForecast,
+  pickDefaultScenarioId,
+} from "@/lib/plan/build-scenarios"
+import { pct } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { Panel, SectionLabel, LevelDots } from "./primitives"
 import { AnimatedCurrency } from "./animated-currency"
 
-export function ScenariosView() {
-  const [selected, setSelected] = useState<string>("a")
-  const active = scenarios.find((s) => s.id === selected)!
+export function ScenariosView({
+  forecast,
+  healed,
+}: {
+  forecast: ForecastResponse
+  healed: boolean
+}) {
+  const scenarios = useMemo(
+    () => buildScenariosFromForecast(forecast),
+    [forecast],
+  )
+  const [selected, setSelected] = useState(() =>
+    pickDefaultScenarioId(scenarios, healed),
+  )
+
+  useEffect(() => {
+    setSelected(pickDefaultScenarioId(scenarios, healed))
+  }, [scenarios, healed])
+
+  const active = scenarios.find((s) => s.id === selected) ?? scenarios[0]
 
   return (
     <div className="space-y-4">
       <Panel className="p-6">
         <SectionLabel>What-if planning</SectionLabel>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Compare strategies side by side. Each plan is scored on the cash it frees, its cost, and the risk it puts on
-          your customer relationships.
+          {healed
+            ? "Gap closed — plans reflect your updated cash position after payment."
+            : "Compare strategies side by side. Each plan is scored on the cash it frees, its cost, and the risk it puts on your customer relationships."}
         </p>
       </Panel>
 
@@ -33,23 +55,29 @@ export function ScenariosView() {
           className={cn(
             "h-fit p-6",
             active.recommended && "ring-1 ring-foreground/20",
+            healed && active.id === "a" && "ring-1 ring-success/40",
           )}
         >
-          <ScenarioDetail active={active} />
+          <ScenarioDetail active={active} healed={healed} />
         </Panel>
       </div>
     </div>
   )
 }
 
-function ScenarioDetail({ active }: { active: Scenario }) {
+function ScenarioDetail({ active, healed }: { active: Scenario; healed: boolean }) {
   return (
     <>
       <div className="flex items-center justify-between">
         <SectionLabel>{active.tag} · detail</SectionLabel>
-        {active.recommended && (
+        {active.recommended && !healed && (
           <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">
             Recommended
+          </span>
+        )}
+        {healed && active.id === "a" && (
+          <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success">
+            Completed
           </span>
         )}
       </div>
@@ -81,13 +109,24 @@ function ScenarioDetail({ active }: { active: Scenario }) {
       </div>
 
       <button
+        disabled={!active.gapClosed && !active.recommended}
         className={cn(
-          "mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition hover:opacity-90",
-          active.gapClosed ? "bg-primary text-primary-foreground" : "border border-border bg-background text-muted-foreground",
+          "mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition hover:opacity-90 disabled:opacity-50",
+          active.gapClosed
+            ? "bg-success/15 text-success"
+            : active.recommended
+              ? "bg-primary text-primary-foreground"
+              : "border border-border bg-background text-muted-foreground",
         )}
       >
-        {active.requiresApproval && <Lock className="size-3.5" />}
-        {active.gapClosed ? `Run ${active.tag}` : "Not recommended"}
+        {active.requiresApproval && !active.gapClosed && <Lock className="size-3.5" />}
+        {active.gapClosed
+          ? healed && active.id === "a"
+            ? "Plan executed — gap closed"
+            : "Gap closed"
+          : active.recommended
+            ? `Run ${active.tag}`
+            : "Not recommended"}
       </button>
     </>
   )

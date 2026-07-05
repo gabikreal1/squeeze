@@ -81,12 +81,19 @@ export default function CountUp({
         onStart();
       }
 
+      const target = direction === 'down' ? from : to;
+
       const timeoutId = setTimeout(() => {
-        motionValue.set(direction === 'down' ? from : to);
+        motionValue.set(target);
       }, delay * 1000);
 
       const durationTimeoutId = setTimeout(
         () => {
+          // Springs settle asymptotically and can stop a hair short of the
+          // target (e.g. 2399.4 → "2,399"). Snap to the exact value at the end.
+          if (ref.current) {
+            ref.current.textContent = formatValue(target);
+          }
           if (typeof onEnd === 'function') {
             onEnd();
           }
@@ -99,17 +106,21 @@ export default function CountUp({
         clearTimeout(durationTimeoutId);
       };
     }
-  }, [isInView, startWhen, motionValue, direction, from, to, delay, onStart, onEnd, duration]);
+  }, [isInView, startWhen, motionValue, direction, from, to, delay, onStart, onEnd, duration, formatValue]);
 
   useEffect(() => {
+    const target = direction === 'down' ? from : to;
     const unsubscribe = springValue.on('change', (latest: number) => {
       if (ref.current) {
-        ref.current.textContent = formatValue(latest);
+        // Snap once we're within a rounding step of the target so the final
+        // frame never displays value-minus-one.
+        const display = Math.abs(latest - target) < 0.5 ? target : latest;
+        ref.current.textContent = formatValue(display);
       }
     });
 
     return () => unsubscribe();
-  }, [springValue, formatValue]);
+  }, [springValue, formatValue, direction, from, to]);
 
   return <span className={className} ref={ref} />;
 }

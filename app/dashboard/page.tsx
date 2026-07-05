@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CheckCircle2,
   LayoutDashboard,
@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { enrichForecast } from "@/lib/enrich-forecast";
-import type { ForecastResponse, TimelinePoint } from "@/lib/squeeze-data";
+import type { ForecastResponse, SqueezeAction, TimelinePoint } from "@/lib/squeeze-data";
 import { cn } from "@/lib/utils";
 import { SqueezeLogo } from "@/components/squeeze/logo";
 import { TodayView } from "@/components/squeeze/today-view";
@@ -22,8 +22,10 @@ import { ActionsView } from "@/components/squeeze/actions-view";
 import { ScenariosView } from "@/components/squeeze/scenarios-view";
 import { BriefingPage } from "@/components/squeeze/briefing-page";
 import { Copilot } from "@/components/squeeze/copilot";
+import { useForecastEvents } from "@/components/squeeze/use-forecast-events";
 import { ThemeToggle } from "@/components/squeeze/theme-toggle";
 import type { ApiForecastResponse } from "@/lib/api/format-forecast";
+import type { ForecastUpdatedPayload } from "@/lib/events/sse-hub";
 
 type ViewId = "today" | "plan" | "customers" | "briefing";
 
@@ -37,18 +39,80 @@ const NAV: { id: ViewId; label: string; icon: LucideIcon; badge?: boolean }[] = 
 export default function DashboardPage() {
   const [view, setView] = useState<ViewId>("today");
   const [forecast, setForecast] = useState<ForecastResponse | null>(null);
+  const [apiForecast, setApiForecast] = useState<ApiForecastResponse | null>(null);
   const [ghostTimeline, setGhostTimeline] = useState<TimelinePoint[] | undefined>();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [healing, setHealing] = useState(false);
-  const [callState, setCallState] = useState<"idle" | "calling" | "done">("idle");
+  const [callStates, setCallStates] = useState<
+    Record<string, "idle" | "calling" | "done">
+  >({});
+  const [messageStates, setMessageStates] = useState<
+    Record<string, "idle" | "sending" | "sent" | "error">
+  >({});
   const [copilotOpen, setCopilotOpen] = useState(false);
-  const [toast, setToast] = useState(false);
+  const [toast, setToast] = useState<{ title: string; detail: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [xeroConnected, setXeroConnected] = useState<boolean | null>(null);
+  const [sseConnected, setSseConnected] = useState(false);
+  const [awaitingPayment, setAwaitingPayment] = useState(false);
+  const awaitingPaymentRef = useRef(false);
+
+  useEffect(() => {
+    awaitingPaymentRef.current = awaitingPayment;
+  }, [awaitingPayment]);
 
   const healed = Boolean(forecast?.gapClosed);
+
+  const showToast = useCallback((title: string, detail: string) => {
+    setToast({ title, detail });
+    window.setTimeout(() => setToast(null), 4200);
+  }, []);
+
+  const applyForecastUpdate = useCallback(
+    (payload: ForecastUpdatedPayload) => {
+      const api = payload.forecast;
+      setForecast((prev) => {
+        if (prev && !prev.gapClosed && api.gapClosed) {
+          setGhostTimeline(prev.timeline);
+        }
+        return enrichForecast(api);
+      });
+      setApiForecast(api);
+      setLastUpdated(new Date());
+      setAwaitingPayment(false);
+      awaitingPaymentRef.current = false;
+      setHealing(false);
+
+      if (api.gapClosed) {
+        setCallStates((prev) => {
+          const next = { ...prev };
+          for (const action of api.actions) {
+            if (action.customer.includes("BrightBuild")) {
+              next[action.id] = "done";
+            }
+          }
+          return next;
+        });
+        const amount = payload.paymentAmount ?? api.paymentReceived;
+        showToast(
+          "Payment received",
+          amount
+            ? `${new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(amount)} landed via Xero — forecast healed.`
+            : "Xero webhook updated your forecast.",
+        );
+      }
+    },
+    [showToast],
+  );
+
+  useForecastEvents({
+    enabled: xeroConnected === true,
+    onConnected: () => setSseConnected(true),
+    onDisconnected: () => setSseConnected(false),
+    onForecastUpdated: applyForecastUpdate,
+  });
 
   const loadForecast = useCallback(async (silent = false) => {
     if (silent) setRefreshing(true);
@@ -58,10 +122,30 @@ export default function DashboardPage() {
     try {
       const response = await fetch("/api/forecast", { cache: "no-store" });
       if (!response.ok) throw new Error("Forecast unavailable");
-      const data = enrichForecast((await response.json()) as ApiForecastResponse);
-      setForecast(data);
+      const raw = (await response.json()) as ApiForecastResponse;
+      setApiForecast(raw);
+      const data = enrichForecast(raw);
+      setForecast((prev) => {
+        if (prev && !prev.gapClosed && data.gapClosed) {
+          setGhostTimeline(prev.timeline);
+        }
+        return data;
+      });
       setLastUpdated(new Date());
-      if (data.gapClosed) setCallState("done");
+      if (data.gapClosed) {
+        setCallStates((prev) => {
+          const next = { ...prev };
+          for (const action of raw.actions) {
+            if (action.customer.includes("BrightBuild")) {
+              next[action.id] = "done";
+            }
+          }
+          return next;
+        });
+        setAwaitingPayment(false);
+        awaitingPaymentRef.current = false;
+        setHealing(false);
+      }
     } catch {
       setError("Could not load forecast. Check Xero connection.");
     } finally {
@@ -78,43 +162,150 @@ export default function DashboardPage() {
       .catch(() => setXeroConnected(false));
   }, [loadForecast]);
 
-  const simulatePayment = async () => {
-    if (!forecast || healing) return;
-    setHealing(true);
-    setGhostTimeline(forecast.timeline);
+  const sendWhatsApp = async (action: SqueezeAction) => {
+    if (!action.messageRung) return;
+    setMessageStates((prev) => ({ ...prev, [action.id]: "sending" }));
+    setError(null);
     try {
-      const response = await fetch("/api/demo/heal", { method: "POST" });
-      if (!response.ok) throw new Error("Heal failed");
-      const data = (await response.json()) as { forecast?: ApiForecastResponse };
-      if (data.forecast) {
-        setForecast(enrichForecast(data.forecast));
-        setLastUpdated(new Date());
-        setCallState("done");
-        setToast(true);
-        setTimeout(() => setToast(false), 4200);
-      } else {
-        await loadForecast(true);
-      }
-    } catch {
-      setError("Could not simulate payment.");
-    } finally {
-      setHealing(false);
+      const response = await fetch("/api/messages/whatsapp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer: action.customer,
+          contactId: action.id,
+          contactPhone: action.contactPhone,
+          invoiceNumber: action.invoiceNumber,
+          amount: action.invoiceAmount,
+          daysOverdue: action.daysOverdue,
+          rung: action.messageRung,
+          dontSqueeze: action.dontSqueeze,
+          orgName: forecast?.orgName,
+        }),
+      });
+      const data = (await response.json()) as { error?: string; preview?: string };
+      if (!response.ok) throw new Error(data.error ?? "WhatsApp send failed");
+      setMessageStates((prev) => ({ ...prev, [action.id]: "sent" }));
+      showToast("WhatsApp sent", `Nudge delivered to ${action.customer}.`);
+    } catch (err) {
+      setMessageStates((prev) => ({ ...prev, [action.id]: "error" }));
+      setError(err instanceof Error ? err.message : "Could not send WhatsApp message.");
     }
   };
 
-  const approveCall = () => {
-    setCallState("calling");
-    setTimeout(() => {
-      void simulatePayment();
-    }, 2200);
+  const recordPayment = async (invoiceNumber = "SQZ-BB-2400") => {
+    if (!forecast || healing || awaitingPayment) return;
+    setHealing(true);
+    setAwaitingPayment(true);
+    setGhostTimeline(forecast.timeline);
+    setError(null);
+    try {
+      const response = await fetch("/api/xero/record-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invoiceNumber }),
+      });
+      const data = (await response.json()) as {
+        error?: string;
+        amount?: number;
+        recorded?: boolean;
+        forecast?: ApiForecastResponse;
+      };
+      if (!response.ok) throw new Error(data.error ?? "Payment recording failed");
+
+      if (data.forecast) {
+        applyForecastUpdate({
+          forecast: data.forecast,
+          source: "payment",
+          paymentAmount: data.amount,
+        });
+      }
+
+      showToast(
+        "Payment received",
+        data.amount
+          ? `${new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(data.amount)} recorded in Xero — forecast healed.`
+          : "Payment recorded in Xero — forecast updated.",
+      );
+
+      // Fallback if webhook/SSE is slow (e.g. ngrok not running).
+      window.setTimeout(async () => {
+        if (!awaitingPaymentRef.current) return;
+        await loadForecast(true);
+      }, 8000);
+    } catch (err) {
+      setGhostTimeline(undefined);
+      setAwaitingPayment(false);
+      setHealing(false);
+      setError(err instanceof Error ? err.message : "Could not record payment in Xero.");
+    }
+  };
+
+  const approveCall = async (action: SqueezeAction) => {
+    setCallStates((prev) => ({ ...prev, [action.id]: "calling" }));
+    setError(null);
+
+    try {
+      const response = await fetch("/api/calls/place", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: action.contactPhone,
+          contactName: action.customer,
+          invoiceAmount: action.invoiceAmount,
+          daysOverdue: action.daysOverdue,
+          invoiceNumber: action.invoiceNumber,
+        }),
+      });
+      const data = (await response.json()) as { error?: string; to?: string };
+      if (!response.ok) throw new Error(data.error ?? "AI call failed");
+
+      showToast(
+        "AI call started",
+        data.to
+          ? `Dialling ${action.customer} at ${data.to}…`
+          : `Dialling ${action.customer}…`,
+      );
+
+      window.setTimeout(() => {
+        setCallStates((prev) =>
+          prev[action.id] === "calling" ? { ...prev, [action.id]: "idle" } : prev,
+        );
+      }, 30000);
+    } catch (err) {
+      setCallStates((prev) => ({ ...prev, [action.id]: "idle" }));
+      setError(err instanceof Error ? err.message : "Could not place AI call.");
+    }
   };
 
   const resetDemo = async () => {
-    await fetch("/api/demo/heal", { method: "DELETE" });
-    setGhostTimeline(undefined);
-    setCallState("idle");
-    setToast(false);
-    await loadForecast(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/demo/heal", { method: "DELETE" });
+      const data = (await response.json()) as {
+        reset?: boolean;
+        forecast?: ApiForecastResponse;
+        error?: string;
+      };
+      if (!response.ok) throw new Error(data.error ?? "Could not reset demo");
+
+      setGhostTimeline(undefined);
+      setCallStates({});
+      setMessageStates({});
+      setAwaitingPayment(false);
+      setHealing(false);
+
+      if (data.forecast) {
+        setApiForecast(data.forecast);
+        setForecast(enrichForecast(data.forecast));
+        setLastUpdated(new Date());
+      } else {
+        await loadForecast(true);
+      }
+
+      showToast("Demo reset", "Gap restored — ready to run the beat again.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not reset demo.");
+    }
   };
 
   const orgName = forecast?.orgName ?? "Squeeze";
@@ -191,6 +382,12 @@ export default function DashboardPage() {
                       {isLive ? "Live Xero" : "Demo data"}
                     </span>
                     {lastUpdated && <span>Updated {lastUpdated.toLocaleTimeString("en-GB")}</span>}
+                    {sseConnected && isLive && (
+                      <span className="inline-flex items-center gap-1 text-success">
+                        <span className="size-1.5 rounded-full bg-success animate-pulse" />
+                        Live
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -209,12 +406,12 @@ export default function DashboardPage() {
                   !healing && (
                     <button
                       type="button"
-                      onClick={() => void simulatePayment()}
-                      disabled={healing || loading}
+                      onClick={() => void recordPayment()}
+                      disabled={healing || loading || xeroConnected !== true}
                       className="hidden items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition hover:bg-primary/20 disabled:opacity-50 sm:inline-flex"
                     >
                       <CheckCircle2 className="size-3.5" />
-                      {healing ? "Healing…" : "Simulate payment"}
+                      {awaitingPayment ? "Waiting for webhook…" : "Record payment in Xero"}
                     </button>
                   )
                 )}
@@ -270,11 +467,21 @@ export default function DashboardPage() {
                     onGoToCustomers={() => setView("customers")}
                   />
                 )}
-                {view === "plan" && <ScenariosView />}
-                {view === "customers" && (
-                  <ActionsView forecast={forecast} onApproveCall={approveCall} callState={callState} />
+                {view === "plan" && forecast && (
+                  <ScenariosView forecast={forecast} healed={healed} />
                 )}
-                {view === "briefing" && <BriefingPage />}
+                {view === "customers" && (
+                  <ActionsView
+                    forecast={forecast}
+                    onApproveCall={approveCall}
+                    callStates={callStates}
+                    onSendMessage={sendWhatsApp}
+                    messageStates={messageStates}
+                  />
+                )}
+                {view === "briefing" && forecast && (
+                  <BriefingPage forecast={forecast} healed={healed} />
+                )}
               </>
             )}
             {error && <p className="mt-4 text-center text-xs text-danger">{error}</p>}
@@ -282,7 +489,11 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <Copilot open={copilotOpen} onClose={() => setCopilotOpen(false)} />
+      <Copilot
+        open={copilotOpen}
+        onClose={() => setCopilotOpen(false)}
+        forecastContext={apiForecast}
+      />
 
       <div
         className={cn(
@@ -295,8 +506,8 @@ export default function DashboardPage() {
             <CheckCircle2 className="size-5" />
           </span>
           <div>
-            <div className="text-sm font-semibold">Payment received</div>
-            <div className="text-xs text-muted-foreground">Forecast healed — gap closed.</div>
+            <div className="text-sm font-semibold">{toast?.title ?? "Done"}</div>
+            <div className="text-xs text-muted-foreground">{toast?.detail ?? ""}</div>
           </div>
         </div>
       </div>

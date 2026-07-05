@@ -107,7 +107,9 @@ export function buildForecast(
   }
 
   const shortfall = Math.max(0, buffer - lowPoint);
-  const safeToSpend = currentBalance - (buffer + Math.max(0, -lowPoint));
+  // Safe-to-spend = worst-day headroom relative to the safety buffer.
+  // Negative when the low point dips below the buffer (i.e. equals -gap).
+  const safeToSpend = lowPoint - buffer;
 
   return {
     curve,
@@ -132,14 +134,18 @@ function buildPatelHistory(): PaidInvoiceHistory[] {
   return rows;
 }
 
+/** Demo debtor line — stored on Xero contacts in seed; same for all demo customers. */
+export const DEMO_CONTACT_PHONE = "+447512593720";
+
 export const DEMO_INVOICES: InvoiceWithExpectedDate[] = [
   {
-    invoiceId: "demo-brightbuild-2400",
+    invoiceId: "SQZ-BB-2400",
     contactId: "brightbuild",
     contactName: "BrightBuild Ltd",
+    contactPhone: DEMO_CONTACT_PHONE,
     amount: 2400,
     dueDate: addDays(DEMO_TODAY, -17),
-    expectedDate: addDays(DEMO_TODAY, 10),
+    expectedDate: addDays(DEMO_TODAY, 6),
     status: "AUTHORISED",
     daysOverdue: 17,
     contactHistory: [],
@@ -152,6 +158,7 @@ export const DEMO_INVOICES: InvoiceWithExpectedDate[] = [
     invoiceId: "demo-patel-900",
     contactId: "patel",
     contactName: "Patel Catering",
+    contactPhone: DEMO_CONTACT_PHONE,
     amount: 900,
     dueDate: addDays(DEMO_TODAY, -6),
     expectedDate: addDays(DEMO_TODAY, 2),
@@ -167,6 +174,7 @@ export const DEMO_INVOICES: InvoiceWithExpectedDate[] = [
     invoiceId: "demo-newline-3200",
     contactId: "newline",
     contactName: "Newline Studio",
+    contactPhone: DEMO_CONTACT_PHONE,
     amount: 3200,
     dueDate: addDays(DEMO_TODAY, -3),
     expectedDate: addDays(DEMO_TODAY, 12),
@@ -185,9 +193,10 @@ export const DEMO_INVOICES: InvoiceWithExpectedDate[] = [
     invoiceId: "demo-riverside-1800",
     contactId: "riverside",
     contactName: "Riverside Hotel",
+    contactPhone: DEMO_CONTACT_PHONE,
     amount: 1800,
     dueDate: addDays(DEMO_TODAY, -2),
-    expectedDate: addDays(DEMO_TODAY, 5),
+    expectedDate: addDays(DEMO_TODAY, 4),
     status: "AUTHORISED",
     daysOverdue: 2,
     contactHistory: [
@@ -203,9 +212,10 @@ export const DEMO_INVOICES: InvoiceWithExpectedDate[] = [
     invoiceId: "demo-henderson-1500",
     contactId: "henderson",
     contactName: "Henderson & Co",
+    contactPhone: DEMO_CONTACT_PHONE,
     amount: 1500,
     dueDate: addDays(DEMO_TODAY, 4),
-    expectedDate: addDays(DEMO_TODAY, 4),
+    expectedDate: addDays(DEMO_TODAY, 8),
     status: "AUTHORISED",
     daysOverdue: 0,
     contactHistory: [
@@ -222,23 +232,23 @@ export const DEMO_BILLS: Bill[] = [
   {
     billId: "demo-supplier",
     description: "Fresh produce supplier",
-    amount: 680,
+    amount: 780,
     payDate: addDays(DEMO_TODAY, 3),
     type: "supplier",
-  },
-  {
-    billId: "demo-vat",
-    description: "VAT set-aside",
-    amount: 420,
-    payDate: addDays(DEMO_TODAY, 4),
-    type: "vat",
   },
   {
     billId: "demo-payroll",
     description: "Weekly payroll",
     amount: 3200,
-    payDate: addDays(DEMO_TODAY, 6),
+    payDate: addDays(DEMO_TODAY, 5),
     type: "payroll",
+  },
+  {
+    billId: "demo-vat",
+    description: "VAT set-aside",
+    amount: 420,
+    payDate: addDays(DEMO_TODAY, 7),
+    type: "vat",
   },
 ];
 
@@ -266,20 +276,14 @@ export function calculateForecast(
 }
 
 export function getDemoForecast(): ForecastResult {
-  const forecast = calculateForecast(
-    DEMO_INVOICES,
-    DEMO_BILLS,
+  // Build straight from the demo invoices/bills using their fixed expected dates
+  // (no behavioural recompute, no hardcoded anchors) so the curve, gap, low day
+  // and safe-to-spend are all internally consistent.
+  return buildForecast(
+    DEMO_TODAY,
     DEMO_BANK_BALANCE,
     DEMO_BUFFER,
-    DEMO_TODAY,
+    DEMO_INVOICES,
+    DEMO_BILLS,
   );
-
-  // Demo narrative anchors: Thursday 9 Jul gap £1,180 with payroll 10 Jul.
-  return {
-    ...forecast,
-    lowDay: "2026-07-09",
-    lowPoint: DEMO_BUFFER - 1180,
-    gap: 1180,
-    safeToSpend: DEMO_BANK_BALANCE - 1180,
-  };
 }

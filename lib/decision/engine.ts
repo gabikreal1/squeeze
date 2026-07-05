@@ -222,7 +222,12 @@ export function getRecommendations(
 ): Recommendation[] {
   const gapInvoices = invoices
     .filter((invoice) => invoice.status === "AUTHORISED")
-    .filter((invoice) => invoice.expectedDate <= forecast.lowDay)
+    // Actionable = anything overdue, or money that lands on/after the low day
+    // (i.e. too late to prevent the shortfall unless we accelerate it).
+    .filter(
+      (invoice) =>
+        invoice.daysOverdue > 0 || invoice.expectedDate >= forecast.lowDay,
+    )
     .sort((a, b) => b.amount - a.amount);
 
   return gapInvoices.map((invoice) =>

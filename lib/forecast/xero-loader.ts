@@ -3,10 +3,12 @@ import { getDb } from "../db/client";
 import {
   getBankBalance,
   getBills,
+  getContacts,
   getInvoices,
   getOrganisations,
   isXeroConnected,
 } from "../xero/client";
+import { buildContactPhoneMaps } from "../xero/contact-phone";
 import {
   calculateForecast,
   computeBehaviouralExpectedDate,
@@ -103,11 +105,34 @@ export function markDemoHealApplied(): void {
     `INSERT INTO settings (key, value) VALUES ('demo_heal_applied', 'true')
      ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
   ).run();
+  clearDemoReplayMode();
 }
 
 export function resetDemoHealState(): void {
   const db = getDb();
   db.prepare(`DELETE FROM settings WHERE key IN ('simulated_paid_invoices', 'demo_heal_applied')`).run();
+  markDemoReplayActive();
+}
+
+export function isDemoReplayActive(): boolean {
+  const db = getDb();
+  const row = db
+    .prepare(`SELECT value FROM settings WHERE key = 'demo_replay_active'`)
+    .get() as { value: string } | undefined;
+  return row?.value === "true";
+}
+
+export function markDemoReplayActive(): void {
+  const db = getDb();
+  db.prepare(
+    `INSERT INTO settings (key, value) VALUES ('demo_replay_active', 'true')
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+  ).run();
+}
+
+export function clearDemoReplayMode(): void {
+  const db = getDb();
+  db.prepare(`DELETE FROM settings WHERE key = 'demo_replay_active'`).run();
 }
 
 export function getSimulatedPaymentTotal(): number {
@@ -165,12 +190,15 @@ export async function loadLiveForecastInput(): Promise<LiveForecastInput | null>
   );
 
   try {
-    const [orgs, receivables, payables, bankBalance] = await Promise.all([
+    const [orgs, receivables, payables, bankBalance, contacts] = await Promise.all([
       getOrganisations(),
       getInvoices(),
       getBills(),
       getBankBalance(),
+      getContacts(),
     ]);
+
+  const { byId: phoneById, byName: phoneByName } = buildContactPhoneMaps(contacts);
 
   const paidHistory = receivables.filter(
     (inv) => inv.status?.toString() === "PAID",
@@ -185,6 +213,12 @@ export async function loadLiveForecastInput(): Promise<LiveForecastInput | null>
     )
     .map((inv) => {
       const contactName = inv.contact?.name ?? "Unknown";
+      const contactId =
+        inv.contact?.contactID ??
+        contactName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      const contactPhone =
+        (inv.contact?.contactID ? phoneById.get(inv.contact.contactID) : undefined) ??
+        phoneByName.get(contactName);
       const dueDate = parseXeroDate(inv.dueDate as string);
       const segment = inferSegment(contactName);
       const history = buildContactHistory(contactName, paidHistory);
@@ -196,7 +230,7 @@ export async function loadLiveForecastInput(): Promise<LiveForecastInput | null>
 
       return {
         invoiceId: inv.invoiceNumber ?? inv.invoiceID ?? contactName,
-        contactId: contactName.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+        contactId,
         contactName,
         amount: invoiceAmount(inv),
         dueDate,
@@ -205,6 +239,7 @@ export async function loadLiveForecastInput(): Promise<LiveForecastInput | null>
         daysOverdue: Math.max(0, daysBetween(dueDate, today)),
         contactHistory: history,
         segment,
+        contactPhone,
         ignoredReminders: loadIgnoredReminderCount(contactName),
         strategicValue: segment === "strategic" ? 0.75 : 0.3,
         trajectorySlowing: segment === "strategic",

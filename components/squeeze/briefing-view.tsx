@@ -1,8 +1,10 @@
 "use client"
 
+import { useMemo } from "react"
 import { ArrowUpRight, Banknote, LineChart, ShoppingCart, Users } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
-import { briefing } from "@/lib/squeeze-data"
+import type { ForecastResponse } from "@/lib/squeeze-data"
+import { buildBriefingFromForecast } from "@/lib/briefing/build-briefing"
 import { cn } from "@/lib/utils"
 import { Panel, SectionLabel } from "./primitives"
 
@@ -13,21 +15,30 @@ const roleIcons: Record<string, LucideIcon> = {
   Revenue: Users,
 }
 
-export function BriefingView() {
+export function BriefingView({
+  forecast,
+  healed,
+}: {
+  forecast: ForecastResponse
+  healed: boolean
+}) {
+  const { title, intro, cards } = useMemo(
+    () => buildBriefingFromForecast(forecast, healed),
+    [forecast, healed],
+  )
+
   return (
     <div className="space-y-4">
       <Panel className="relative overflow-hidden p-6">
         <SectionLabel>Monday briefing</SectionLabel>
         <h2 className="mt-2 max-w-2xl text-balance text-2xl font-semibold leading-tight tracking-tight text-foreground">
-          Squeeze is becoming a whole finance department for Maya&apos;s Catering.
+          {title}
         </h2>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Four roles, one operator. Here&apos;s what each function flagged this week.
-        </p>
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{intro}</p>
       </Panel>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {briefing.map((b) => {
+        {cards.map((b) => {
           const Icon = roleIcons[b.role] ?? Banknote
           const accent =
             b.accent === "danger"

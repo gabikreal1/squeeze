@@ -10,7 +10,8 @@
     "seed": "tsx scripts/seed.ts",
     "db:migrate": "tsx lib/db/migrate.ts",
     "xero:smoke": "tsx scripts/xero-smoke.ts",
-    "xero:auth": "tsx scripts/xero-auth.ts"
+    "xero:auth": "tsx scripts/xero-auth.ts",
+    "whatsapp:smoke": "tsx scripts/whatsapp-smoke.ts"
   },
   "dependencies": {
     "better-sqlite3": "^11.9.0",

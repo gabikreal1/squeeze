@@ -1,9 +1,10 @@
 "use client"
 
-import type { ReactNode } from "react"
+import { useMemo, type ReactNode } from "react"
 import { Area, AreaChart, ResponsiveContainer } from "recharts"
-import { TrendingUp } from "lucide-react"
-import { businessHealth as h } from "@/lib/squeeze-data"
+import { TrendingDown, TrendingUp } from "lucide-react"
+import type { ForecastResponse } from "@/lib/squeeze-data"
+import { buildHealthFromForecast } from "@/lib/briefing/build-briefing"
 import { cn } from "@/lib/utils"
 import { Panel, SectionLabel } from "./primitives"
 import { AnimatedCurrency } from "./animated-currency"
@@ -11,10 +12,18 @@ import CountUp from "@/components/CountUp"
 
 const concentrationColors = ["var(--chart-2)", "var(--chart-1)", "var(--chart-4)", "var(--chart-3)", "var(--chart-5)"]
 
-export function HealthView() {
+export function HealthView({
+  forecast,
+  healed,
+}: {
+  forecast: ForecastResponse
+  healed: boolean
+}) {
+  const h = useMemo(() => buildHealthFromForecast(forecast, healed), [forecast, healed])
   const dsoData = h.dsoTrend.map((v, i) => ({ i, v }))
-  const maxLate = Math.max(...h.lateByValue.map((l) => l.amount))
+  const maxLate = Math.max(...h.lateByValue.map((l) => l.amount), 1)
   const pnl = h.pnl
+  const dsoRising = !healed && h.dsoTrend[h.dsoTrend.length - 1] > h.dsoTrend[0]
 
   return (
     <div className="space-y-4">
@@ -38,8 +47,21 @@ export function HealthView() {
         <Panel className="p-6">
           <div className="flex items-center justify-between">
             <SectionLabel>Days sales outstanding</SectionLabel>
-            <span className="flex items-center gap-1 text-xs text-danger">
-              <TrendingUp className="size-3.5" /> rising
+            <span
+              className={cn(
+                "flex items-center gap-1 text-xs",
+                dsoRising ? "text-danger" : "text-success",
+              )}
+            >
+              {dsoRising ? (
+                <>
+                  <TrendingUp className="size-3.5" /> rising
+                </>
+              ) : (
+                <>
+                  <TrendingDown className="size-3.5" /> improving
+                </>
+              )}
             </span>
           </div>
           <div className="mt-3 flex items-end gap-2">
@@ -92,7 +114,10 @@ export function HealthView() {
         <Panel className="p-6">
           <SectionLabel>Late invoices by value</SectionLabel>
           <div className="mt-4 space-y-4">
-            {h.lateByValue.map((l) => (
+            {h.lateByValue.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No overdue invoices driving the gap.</p>
+            ) : (
+              h.lateByValue.map((l) => (
               <div key={l.name}>
                 <div className="flex items-baseline justify-between text-sm">
                   <span className="text-foreground">{l.name}</span>
@@ -102,7 +127,8 @@ export function HealthView() {
                   <div className="h-full rounded-full bg-warning/70" style={{ width: `${(l.amount / maxLate) * 100}%` }} />
                 </div>
               </div>
-            ))}
+              ))
+            )}
           </div>
         </Panel>
       </div>

@@ -10,6 +10,7 @@ import {
   buildLiveForecast,
   getSimulatedPaymentTotal,
   isDemoHealApplied,
+  isDemoReplayActive,
 } from "../forecast/xero-loader";
 
 export type ApiForecastAction = {
@@ -24,7 +25,11 @@ export type ApiForecastAction = {
   relationshipRisk: "low" | "medium" | "high";
   accent?: "lemon" | "danger" | "neutral";
   actionLabel?: string;
+  messageRung?: "nudge" | "firm_reminder";
+  contactPhone?: string;
   dontSqueeze?: boolean;
+  daysOverdue: number;
+  expectedDate: string;
 };
 
 export type ApiOutflow = {
@@ -118,6 +123,9 @@ function formatAction(rec: Recommendation): ApiForecastAction {
     customer: rec.contactName,
     invoiceAmount: rec.amount,
     invoiceNumber: invoice.invoiceId,
+    contactPhone: invoice.contactPhone,
+    daysOverdue: invoice.daysOverdue,
+    expectedDate: invoice.expectedDate,
     summary: summaryParts.join(" · "),
     recommendation: rec.reasoning,
     speed: level(rec.speed, 3, 7),
@@ -125,14 +133,20 @@ function formatAction(rec: Recommendation): ApiForecastAction {
     relationshipRisk: level(rec.relRisk, 0.35, 0.6),
     accent,
     dontSqueeze: rec.dontSqueeze,
+    messageRung:
+      rec.rung === "nudge" || rec.rung === "firm_reminder" ? rec.rung : undefined,
     actionLabel:
-      rec.dontSqueeze || rec.rung === "watch"
-        ? undefined
-        : rec.rung === "ai_call"
-          ? "AI call"
-          : rec.rung === "nudge"
-            ? "Send nudge"
-            : rec.rung.replace(/_/g, " "),
+      rec.dontSqueeze
+        ? "Send soft nudge"
+        : rec.rung === "watch"
+          ? undefined
+          : rec.rung === "ai_call"
+            ? "AI call"
+            : rec.rung === "nudge"
+              ? "Send WhatsApp nudge"
+              : rec.rung === "firm_reminder"
+                ? "Send firm reminder"
+                : rec.rung.replace(/_/g, " "),
   };
 }
 
@@ -152,12 +166,14 @@ function buildGapDrivers(
   invoices: InvoiceWithExpectedDate[],
   forecast: ForecastResult,
 ): ApiGapDriver[] {
+  // Gap drivers = receivables that land ON or AFTER the low day, i.e. money that
+  // arrives too late to prevent the shortfall. Most-overdue first.
   return invoices
     .filter(
       (inv) =>
-        inv.status === "AUTHORISED" && inv.expectedDate <= forecast.lowDay,
+        inv.status === "AUTHORISED" && inv.expectedDate >= forecast.lowDay,
     )
-    .sort((a, b) => b.amount - a.amount)
+    .sort((a, b) => b.daysOverdue - a.daysOverdue || b.amount - a.amount)
     .slice(0, 6)
     .map((inv) => ({
       contact: inv.contactName,
@@ -241,11 +257,16 @@ export function applyDemoHealOverlay(
   response: ApiForecastResponse,
   paymentAmount: number,
 ): ApiForecastResponse {
+  const gapAmount = response.gap?.amount ?? 0;
+  // Pulling the overdue invoice forward lifts every below-buffer day by the
+  // payment, so the new worst-day headroom = payment - gap (e.g. 2400 - 1180 = 1220).
+  const healedSafeToSpend = Math.max(paymentAmount - gapAmount, 200);
+
   const timeline = response.timeline.map((day) => {
     if (day.balance < day.buffer) {
       return {
         ...day,
-        balance: day.buffer + 200,
+        balance: day.balance + paymentAmount,
         isLowDay: false,
       };
     }
@@ -257,7 +278,7 @@ export function applyDemoHealOverlay(
     gap: undefined,
     gapClosed: true,
     paymentReceived: paymentAmount,
-    safeToSpend: Math.max(response.currentBalance - response.buffer, 200),
+    safeToSpend: healedSafeToSpend,
     timeline,
     gapDrivers: response.gapDrivers.filter(
       (driver) => !driver.contact.includes("BrightBuild"),
@@ -268,14 +289,31 @@ export function applyDemoHealOverlay(
   };
 }
 
-export async function formatLiveForecastResponse(): Promise<ApiForecastResponse | null> {
+/** Replay demo: restore the pre-payment gap story even if BrightBuild was paid in Xero. */
+export function applyDemoReplayOverlay(
+  response: ApiForecastResponse,
+): ApiForecastResponse {
+  const demo = formatDemoForecastResponse();
+  return {
+    ...demo,
+    source: response.source,
+    orgName: response.orgName,
+    demo: response.demo,
+    gapClosed: undefined,
+    paymentReceived: undefined,
+  };
+}
+
+export async function formatLiveForecastResponse(options?: {
+  paymentAmount?: number;
+}): Promise<ApiForecastResponse | null> {
   const live = await buildLiveForecast();
   if (!live) return null;
 
   const { input, forecast } = live;
   const actions = rankActions(input.invoices, forecast, input.today);
 
-  const response = buildResponse(forecast, input.invoices, actions, {
+  let response = buildResponse(forecast, input.invoices, actions, {
     source: "xero",
     orgName: input.orgName,
     today: input.today,
@@ -291,8 +329,37 @@ export async function formatLiveForecastResponse(): Promise<ApiForecastResponse 
       type: bill.type,
     }));
 
+  if (isDemoReplayActive()) {
+    return applyDemoReplayOverlay(response);
+  }
+
   if (isDemoHealApplied()) {
     return applyDemoHealOverlay(response, getSimulatedPaymentTotal());
+  }
+
+  const paymentAmount = options?.paymentAmount;
+  const brightBuildOutstanding =
+    response.gapDrivers.some((d) => d.contact.includes("BrightBuild")) ||
+    response.actions.some((a) => a.customer.includes("BrightBuild"));
+
+  if (paymentAmount && paymentAmount > 0) {
+    return applyDemoHealOverlay(response, paymentAmount);
+  }
+
+  if (!brightBuildOutstanding && response.gap) {
+    const inferred =
+      response.gapDrivers.find((d) => d.contact.includes("BrightBuild"))
+        ?.amount ?? response.gap.amount;
+    return applyDemoHealOverlay(response, inferred);
+  }
+
+  if (!response.gap || response.gap.amount <= 0) {
+    return {
+      ...response,
+      gap: undefined,
+      gapClosed: true,
+      paymentReceived: paymentAmount,
+    };
   }
 
   return response;
@@ -310,10 +377,14 @@ export function formatDemoForecastResponse(): ApiForecastResponse {
 
   response.unpaidPayables = 3;
   response.outflows = [
-    { date: "2026-07-07", label: "Mon · supplier", amount: 680, type: "supplier" },
-    { date: "2026-07-08", label: "Tue · vat", amount: 420, type: "vat" },
-    { date: "2026-07-09", label: "Wed · payroll", amount: 3200, type: "payroll" },
+    { date: "2026-07-07", label: "Tue · supplier", amount: 780, type: "supplier" },
+    { date: "2026-07-09", label: "Thu · payroll", amount: 3200, type: "payroll" },
+    { date: "2026-07-11", label: "Sat · vat", amount: 420, type: "vat" },
   ];
+
+  if (isDemoHealApplied()) {
+    return applyDemoHealOverlay(response, getSimulatedPaymentTotal());
+  }
 
   return response;
 }

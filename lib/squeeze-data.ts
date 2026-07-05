@@ -38,6 +38,8 @@ export type SqueezeAction = {
   relationshipRisk: Level;
   accent?: "lemon" | "danger" | "neutral";
   actionLabel?: string;
+  messageRung?: "nudge" | "firm_reminder";
+  contactPhone?: string;
   dontSqueeze?: boolean;
   daysOverdue: number;
   expectedDate: string;

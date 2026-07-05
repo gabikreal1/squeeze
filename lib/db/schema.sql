@@ -19,3 +19,12 @@ CREATE TABLE IF NOT EXISTS xero_cache (
   payload_json TEXT NOT NULL,
   fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS call_sessions (
+  call_sid TEXT PRIMARY KEY,
+  context_json TEXT NOT NULL,
+  turn INTEGER NOT NULL DEFAULT 0,
+  messages_json TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

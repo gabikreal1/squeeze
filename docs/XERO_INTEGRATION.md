@@ -22,7 +22,7 @@ Primary: official **Xero MCP server** for agent tool access.
       "env": {
         "XERO_CLIENT_ID": "…",
         "XERO_CLIENT_SECRET": "…",
-        "XERO_SCOPES": "accounting.invoices accounting.payments accounting.contacts accounting.settings accounting.reports.aged.read accounting.attachments"
+        "XERO_SCOPES": "accounting.invoices accounting.payments accounting.contacts accounting.settings"
       }
     }
   }
@@ -36,28 +36,25 @@ Supplement with **direct REST** (`api.xero.com/api.xro/2.0/…`) for anything th
 ## 3. OAuth 2.0 scopes required
 
 ```
-accounting.invoices              # read/write invoices (receivables)
+accounting.invoices              # read/write invoices (receivables + bills)
 accounting.payments              # detect + record payments
 accounting.contacts              # customers + payment behaviour
 accounting.settings              # org, accounts, tax rates
-accounting.reports.aged.read     # aged receivables report
-accounting.banktransactions      # bank lines / cash position
-accounting.attachments           # attach evidence to LBA pack (Files)
 offline_access                   # refresh token (OAuth mode only)
 ```
-
-Minimum viable (core loop only): `accounting.invoices accounting.payments accounting.contacts accounting.settings`.
 
 ## 4. Endpoints used (for the "which endpoints" question)
 
 | Endpoint | Method(s) | Purpose |
 |---|---|---|
-| `/Invoices` | GET, POST, PUT | Pull overdue receivables; set expected dates / notes; record actions |
-| `/Payments` | GET, POST | Detect settled invoices; record payments |
-| `/Contacts` | GET | Customer details + history for behavioural dates |
-| `/Reports/AgedReceivablesByContact` | GET | Overdue exposure per customer |
-| `/BankTransactions` (+ `/Accounts`) | GET | Current cash position for the forecast |
-| `/Files` (Files API) | POST | Attach invoice PDF / history to the LBA evidence pack |
+| `/Invoices` | GET, PUT | Pull receivables (`ACCREC`) + bills (`ACCPAY`) for the forecast; seed demo invoices |
+| `/Invoices/{InvoiceID}` | GET | Fetch a single invoice with its payments |
+| `/Payments` | PUT | Record a payment against a receivable (pay‑down action) |
+| `/Payments/{PaymentID}` | GET, POST (Status=DELETED) | Payment lookup; reverse a payment to reset the demo |
+| `/Contacts` | GET, PUT, POST | Customer details + history; seed/update demo contacts |
+| `/Accounts` | GET, PUT | Bank balances for cash position; create demo bank account |
+| `/Organisation` | GET | Connection check / org details |
+| `/TaxRates` | GET | Tax setup (demo seeding) |
 | Webhooks | (subscribe) | Real‑time Invoice + Payment events → forecast heals |
 
 ## 5. Webhooks

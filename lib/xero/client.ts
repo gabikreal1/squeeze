@@ -7,9 +7,6 @@ const DEFAULT_SCOPES = [
   "accounting.payments",
   "accounting.contacts",
   "accounting.settings",
-  "accounting.reports.aged.read",
-  "accounting.banktransactions",
-  "accounting.attachments",
   "offline_access",
 ].join(" ");
 

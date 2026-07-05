@@ -91,12 +91,13 @@ function enrichAction(
   gapDrivers: GapDriver[],
 ): SqueezeAction {
   const driver = gapDrivers.find((d) => d.contact === action.customer);
-  const daysOverdue = driver?.daysOverdue ?? 0;
+  const daysOverdue = action.daysOverdue ?? driver?.daysOverdue ?? 0;
+  const expectedDate = action.expectedDate ?? driver?.expectedDate;
 
   return {
     ...action,
     daysOverdue,
-    expectedDate: driver ? formatShortDate(driver.expectedDate) : "Soon",
+    expectedDate: expectedDate ? formatShortDate(expectedDate) : "Soon",
     paymentPattern: action.dontSqueeze
       ? "Reliably late but always pays"
       : action.accent === "danger"
@@ -105,7 +106,7 @@ function enrichAction(
     riskClass: riskClass(action),
     relationshipValue: action.dontSqueeze ? "high" : action.accent === "danger" ? "low" : "medium",
     confidence: action.dontSqueeze ? 0.94 : action.accent === "danger" ? 0.78 : 0.71,
-    expectedCashDate: action.dontSqueeze ? formatShortDate(driver?.expectedDate ?? "") : "Today, if action succeeds",
+    expectedCashDate: action.dontSqueeze ? formatShortDate(expectedDate ?? "") : "Today, if action succeeds",
     reasoning: action.recommendation,
     ladder: buildLadder(action),
   };
