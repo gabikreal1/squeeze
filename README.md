@@ -25,12 +25,6 @@ One brain (your Xero org), one number the owner cares about — **Safe to Spend*
 
 And it knows **when *not* to squeeze**: a loyal customer who always pays a little late gets a gentle nudge; a first‑timer who's ghosted two emails gets the firm path.
 
-## Why it wins (positioning)
-
-- **JAX‑proof by construction.** Everything Squeeze does acts *outward* — toward debtors, lenders, suppliers. Xero's own assistant will never pressure one Xero customer for another, or broker against Xero's financing partners. Cash‑flow + polite chasing is on JAX's roadmap; adversarial, cross‑party action is not.
-- **Differentiated from incumbents.** Chaser chases on a schedule regardless of whether you need the cash. Paidnice applies fees. Satago finances. Garfield sends legal letters. **None connects the action to your cash position.** Squeeze is the *decision layer*.
-- **Track fit.** Targets the Xero hackathon **Revenue / data‑&‑insights track**: analyse accounting data → surface actionable insights → take proactive steps to improve cash flow, combining *data analysis + autonomous action → measurable outcomes*.
-
 ---
 
 ## Documentation
