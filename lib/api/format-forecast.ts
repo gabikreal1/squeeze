@@ -252,7 +252,7 @@ function buildOutflowsFromForecast(
     }));
 }
 
-/** Demo beat: BrightBuild payment lands and the Thursday gap closes on stage. */
+/** BrightBuild payment lands and the Thursday gap closes. */
 export function applyDemoHealOverlay(
   response: ApiForecastResponse,
   paymentAmount: number,

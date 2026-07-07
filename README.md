@@ -1,98 +1,165 @@
-# 🍋 Squeeze
+# Squeeze
 
-**Squeeze your receivables before your payables squeeze you.**
+**The AI credit controller for Xero.**
 
-Squeeze is an AI credit controller that lives on your Xero data. It predicts the exact day your cash will run short, pinpoints the specific unpaid invoices causing the gap, and takes the cheapest effective action to close it — a polite nudge, an AI phone call, an early‑payment discount, invoice financing, or a court‑ready Letter Before Action — always proportionate, always with you approving the serious steps.
-
-Big companies have credit controllers, treasury desks and procurement teams keeping them cash‑positive. The 4.4M small businesses on Xero have the owner, at 9pm, embarrassed to chase a friend for money. Squeeze gives a 4‑person business the receivables muscle of a 400‑person one, for the price of a subscription.
+Squeeze your receivables before your payables squeeze you.
 
 ---
 
-## The problem
+Small businesses don't go broke from bad dashboards. They go broke because an invoice paid three weeks late lands *after* payroll. Big companies have credit controllers and treasury teams keeping them cash-positive. The 4.4 million small businesses on Xero have the owner — at 9pm, embarrassed to chase a friend for money.
 
-- Small businesses don't go broke from bad dashboards. They go broke because an invoice paid three weeks late lands *after* payroll.
-- Xero's own short‑term cash flow assumes everyone pays on the due date. Overdue invoices with no expected date **vanish from the forecast** — Xero's own community calls it "almost redundant."
-- The enterprise fix is a *person* (a credit controller, ~£30–40k/yr) or a *platform* (procurement suites from ~$3,000/mo). Neither is reachable for a plumber or a caterer.
+**Squeeze gives a 4-person business the receivables muscle of a 400-person one.**
 
-## What Squeeze does
+Connect your Xero organisation and get one number you can trust: **Safe to Spend**. When cash is about to run short, Squeeze finds the invoices causing the gap, recommends the right action, and handles the follow-up — always proportionate, always with you in control.
 
-One brain (your Xero org), one number the owner cares about — **Safe to Spend** — and a credit controller working behind it:
+---
 
-1. **Predicts the gap** — 14‑day cash view using how each customer *actually* pays (behavioural dates), not naive due dates. Surfaces the lowest point: *"Thursday you'll be £1,180 under safe cash."*
-2. **Finds the cause** — ranks the specific unpaid invoices driving the gap.
-3. **Picks the move** — for each invoice, proposes the cheapest effective action, scored on **speed / cost / relationship risk**.
-4. **Acts, on approval** — executes, writes everything back to Xero, and the Safe‑to‑Spend number visibly **heals** when payment lands.
+## Why Squeeze
 
-And it knows **when *not* to squeeze**: a loyal customer who always pays a little late gets a gentle nudge; a first‑timer who's ghosted two emails gets the firm path.
+| Without Squeeze | With Squeeze |
+|---|---|
+| Cash forecasts assume everyone pays on the due date | 14-day forecast based on how each customer *actually* pays |
+| Overdue invoices with no expected date vanish from the picture | Every receivable is tracked with a behavioural payment date |
+| Chasing is manual, awkward, and easy to put off | Escalation is automatic, scored, and relationship-aware |
+| No one owns collections until it's a crisis | An AI credit controller works the gap before payroll hits |
+
+---
+
+## What you get
+
+### Safe to Spend
+A single headline number: how much cash you can safely use right now, after upcoming bills, payroll, and your safety buffer. Updated in real time as payments land.
+
+### Gap prediction
+See exactly when cash will run short — *"Thursday you'll be £1,180 under safe cash"* — with a day-by-day 14-day cash curve, not a static report.
+
+### Root-cause diagnosis
+Squeeze ranks the specific unpaid invoices driving the shortfall, so you know who to focus on and why.
+
+### Smart escalation
+For each invoice, Squeeze picks the cheapest effective action along a proportionate ladder:
+
+- **Watch** — reliable payer, gap not urgent yet
+- **Soft nudge** — polite email or WhatsApp reminder
+- **Firm reminder** — terms passed, nudge ignored
+- **AI phone call** — disclosed B2B call when cash is needed soon
+- **Early-payment discount** — fast cash without burning the relationship
+- **Invoice financing** — when chasing is too slow
+- **Letter Before Action** — court-ready documentation for genuine non-payers
+
+Serious steps require your approval. Squeeze knows when *not* to squeeze — a loyal customer who always pays a little late gets a gentle nudge; a first-timer who's ghosted two emails gets the firm path.
+
+### Real-time healing
+When a payment lands in Xero, your forecast updates instantly. Safe to Spend visibly recovers — the moment money hits, you see it.
+
+### Full audit trail
+Every action, call, and note is logged and written back to Xero. Nothing happens in the dark.
+
+---
+
+## How it works
+
+```
+  1. PREDICT  →  14-day Safe to Spend forecast
+  2. DIAGNOSE →  which invoices cause the gap
+  3. DECIDE   →  best action per invoice, ranked
+  4. ACT      →  execute on your approval, write back to Xero
+         ▲                              │
+         └──── forecast heals on payment ┘
+```
+
+1. **Connect Xero** — Squeeze reads your invoices, contacts, bills, and bank balance.
+2. **See your gap** — a deterministic forecast engine projects cash day by day using behavioural payment dates.
+3. **Review actions** — the decision engine scores speed, cost, and relationship risk for each invoice.
+4. **Approve and act** — Squeeze sends messages, places calls, or prepares documents. You stay in control.
+
+---
+
+## Built for
+
+Tradespeople, agencies, caterers, cleaners, consultants, and small wholesalers — any Xero business that sells on payment terms and feels cash timing pain. Typically 1–20 people, no finance staff, owner doing the chasing (or avoiding it).
+
+**B2B only.** Squeeze chases your business customers on your own invoices — not consumer debt, not third-party collection. AI is disclosed on every call. Human approval gates every serious escalation.
+
+---
+
+## Integrations
+
+**Xero** — OAuth 2.0 connection with read access to invoices, contacts, accounts, and settings; write access for payments and notes. Webhook-driven updates keep your dashboard live.
+
+**Twilio** — WhatsApp, SMS, and AI voice calls for collections outreach.
+
+**OpenAI** — Copilot for questions about your cash position; GPT-powered dialogue on outbound calls.
+
+---
+
+## Get started
+
+### Prerequisites
+
+- Node.js 20+
+- A [Xero developer app](https://developer.xero.com/) with accounting scopes
+- API keys for OpenAI and Twilio (for copilot and outbound comms)
+
+### Run locally
+
+```bash
+git clone https://github.com/gabikreal1/squeeze.git
+cd squeeze
+npm install
+cp .env.example .env   # fill in your keys
+npm run db:migrate
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000), connect your Xero organisation, and Squeeze will build your first forecast.
+
+For a public tunnel (required for Xero webhooks and Twilio voice), set `PUBLIC_BASE_URL` to your HTTPS URL.
+
+---
+
+## Architecture
+
+Squeeze is a Next.js application with a deterministic forecast core and an AI-assisted action layer.
+
+- **Forecast engine** — behavioural payment dates, 14-day balance projection, gap detection. Pure code, no LLM in the arithmetic.
+- **Decision engine** — scores each invoice on speed, cost, and relationship risk; selects the escalation rung.
+- **Action executors** — Twilio voice/WhatsApp/SMS, payment recording via Xero `/Payments`, audit logging.
+- **Real-time layer** — Xero webhooks trigger forecast re-runs; Server-Sent Events push updates to the dashboard.
+
+```mermaid
+flowchart LR
+    subgraph XERO["Xero"]
+        API["Accounting API"]
+        WH["Webhooks"]
+    end
+
+    subgraph SQUEEZE["Squeeze"]
+        FE["Forecast engine"]
+        DE["Decision engine"]
+        ACT["Actions: calls, messages, payments"]
+        UI["Dashboard + Copilot"]
+    end
+
+    API --> FE --> DE --> ACT
+    ACT --> API
+    WH --> FE
+    FE --> UI
+```
 
 ---
 
 ## Documentation
 
-| Doc | What's in it |
+| Document | Description |
 |---|---|
-| [`docs/PRODUCT_SPEC.md`](docs/PRODUCT_SPEC.md) | Full product spec: users, the loop, the escalation ladder, scope & compliance |
-| [`docs/DECISION_ENGINE.md`](docs/DECISION_ENGINE.md) | Everything Squeeze weighs + forecast & scoring pseudocode |
+| [`docs/PRODUCT_SPEC.md`](docs/PRODUCT_SPEC.md) | Product overview, user personas, the action ladder, compliance |
+| [`docs/DECISION_ENGINE.md`](docs/DECISION_ENGINE.md) | Scoring model and escalation logic |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Stack, components, data flow, repo layout |
-| [`docs/XERO_INTEGRATION.md`](docs/XERO_INTEGRATION.md) | Endpoints, OAuth scopes, webhooks, MCP server, seed data |
-| [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md) | 48‑hour phased plan, hour budget, fallback tiers |
-| [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) | 3‑minute pitch mapped to the judging rubric |
+| [`docs/XERO_INTEGRATION.md`](docs/XERO_INTEGRATION.md) | OAuth, endpoints, webhooks, scopes |
 
-## How Xero is integrated
+---
 
-Squeeze connects to a Xero org and turns the ledger into a live 14‑day cash‑flow forecast with one headline number, **Safe to Spend**. On connect we read receivables and bills from `/Invoices`, customers from `/Contacts`, and bank balances from `/Accounts`, then run a deterministic engine that projects the running balance day‑by‑day using each customer's behavioural payment dates rather than naive due dates. That surfaces the exact low point and shortfall (e.g. "Thursday you're £1,180 under safe cash") and ranks the specific unpaid invoices causing it. No LLM touches the arithmetic — the forecast, low‑point detection and gap are pure reproducible code.
+## License
 
-On top of that sits a decision engine that scores each culpable invoice on speed, cost and relationship risk and picks the cheapest effective action along a proportionate escalation ladder (watch → soft nudge → firm reminder → AI phone call → early‑pay discount → financing → Letter Before Action), including logic for when *not* to chase a reliable payer. Serious rungs need owner approval. The AI layer only drafts messages, answers questions in a copilot, and runs the outbound call (Twilio Voice: speech‑to‑text → GPT reply → text‑to‑speech), with WhatsApp/SMS for gentler rungs.
-
-When an action succeeds we write the settlement back to Xero via `/Payments` (and reverse it with `/Payments/{id}` `Status=DELETED` so the demo is repeatable). The integration is webhook‑driven: a signed Xero webhook (HMAC `x-xero-signature` verification plus the intent‑to‑receive handshake) fires on Invoice and Payment events, re‑runs the forecast, and streams the update to the dashboard over Server‑Sent Events, so Safe to Spend visibly heals the moment money lands.
-
-Implementation is a Next.js app using `xero-node`, with OAuth 2.0 (both standard Web‑app auth with refresh‑token rotation and Custom Connection client‑credentials) on granular scopes `accounting.invoices`, `accounting.payments`, `accounting.contacts`, `accounting.settings`, `offline_access`. SQLite holds state including durable call sessions that survive restarts, and every call and payment is logged for a full audit trail written back into Xero.
-
-```mermaid
-flowchart LR
-    subgraph XERO["Xero Platform"]
-        OAUTH["OAuth 2.0 server\n(auth + token refresh)"]
-        API["Accounting API\n/Invoices /Contacts\n/Accounts /Payments\n/Organisation /TaxRates"]
-        WH["Webhooks\n(Invoice + Payment events)"]
-    end
-
-    subgraph AUTH["Auth layer"]
-        OA["oauth.ts / client.ts\nWeb-app OAuth + Custom Connection"]
-        TS[("Token store\nSQLite")]
-    end
-
-    subgraph READ["Data ingestion"]
-        RD["getInvoices / getBills\ngetContacts / getBankBalance"]
-    end
-
-    subgraph CORE["Deterministic core"]
-        FE["Forecast engine\nbehavioural dates →\n14-day balance → low point + gap"]
-        DE["Decision engine\nscore speed/cost/risk →\nescalation ladder"]
-    end
-
-    subgraph ACT["Action executors"]
-        PAY["recordInvoicePayment\nreverseInvoicePayment"]
-        COMMS["AI call / WhatsApp / SMS\n(Twilio + GPT)"]
-    end
-
-    subgraph WHIN["Real-time in"]
-        WHR["Webhook receiver\nHMAC verify +\nintent-to-receive"]
-        SSE["SSE hub → dashboard\n(Safe-to-Spend heals)"]
-    end
-
-    OA <-->|authorize / refresh| OAUTH
-    OA <--> TS
-    RD -->|GET| API
-    RD --> FE --> DE --> ACT
-    PAY -->|PUT /Payments\nPOST Status=DELETED| API
-    COMMS -.->|on success| PAY
-    API -->|event fires| WH --> WHR
-    WHR -->|re-run| FE
-    WHR --> SSE
-    OA -. tokens .-> RD
-    OA -. tokens .-> PAY
-```
-
-## Status
-
-Built for the Encode × Xero App & Agent Hackathon (London, 4–5 Jul 2026). Next.js app with a live Xero integration: deterministic forecast + decision engine, webhook‑driven real‑time healing, and AI‑assisted collections (copilot, WhatsApp, outbound voice).
+Proprietary — see [LICENSE](LICENSE).

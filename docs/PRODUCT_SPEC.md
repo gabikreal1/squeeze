@@ -57,15 +57,15 @@ For each gap‑causing invoice, Squeeze recommends the **cheapest effective rung
 - Squeeze executes: sends the message, places the call, drafts the letter, records notes/expected dates/logged calls **back into Xero**.
 - On payment (webhook), the forecast **heals** on screen — the emotional payoff.
 
-## 4. "Knows when not to squeeze" (the trust moment)
+## 4. Relationship-aware escalation
 
-Squeeze is relationship‑aware by design. In the demo it visibly *declines* to escalate a loyal customer:
+Squeeze is relationship-aware by design. It declines to escalate a loyal customer:
 
 > *"Patel always pays ~8 days late but always pays — don't squeeze, just nudge."*
 
-…right before it goes firm on a first‑time ghoster. This single contrast turns the name's edge into proof of intelligence and defuses the "aggressive AI collections" optics.
+…while going firm on a first-time ghoster who is driving the gap. This contrast proves intelligence and defuses the "aggressive AI collections" concern.
 
-## 5. Scope & compliance (one slide's worth)
+## 5. Scope & compliance
 
 - **B2B only.** Chasing business customers, not consumers.
 - **Own debts.** The business's own invoices — *not* third‑party collection. This puts it outside FDCPA (US, consumer + third‑party only) and outside UK FCA authorisation (required for consumer / third‑party debt, not own commercial debt).
@@ -74,30 +74,32 @@ Squeeze is relationship‑aware by design. In the demo it visibly *declines* to 
 - **Full audit trail** written to Xero.
 - **Legal rung = document prep, not filing.** Squeeze prepares a Pre‑Action‑Protocol‑compliant Letter Before Action + evidence bundle and auto‑computes statutory entitlements (8% over base rate + £40/£70/£100 fixed compensation under the Late Payment of Commercial Debts Act). It does **not** file at court (Money Claim Online has no public API; and a 14–30 day LBA window is mandatory first anyway). "Document assembly, not legal advice."
 
-## 6. The "finance department" vision (pitch, not v1 build)
+## 6. Roadmap — the finance department
 
-Squeeze (the credit controller) is hire #1. Two colleagues appear as **cards in the Monday briefing** to sell the platform vision without deep build:
-- **Treasury** — time payables: *"Pay Henderson early for a 2%/10‑day discount = ~18% annualised on idle cash; delay the software bill to its true due date for £900 float."*
+Squeeze (the credit controller) is the first hire. Two additional agents appear as cards in the Monday briefing:
+
+- **Treasury** — time payables: *"Pay Henderson early for a 2%/10-day discount = ~18% annualised on idle cash; delay the software bill to its true due date for £900 float."*
 - **Procurement** — *"Your waste supplier raised prices 14% in March — here's the renegotiation email."*
 
-> A 200‑person company runs finance with specialists costing £150k+/yr. We gave the same department to 4.4M small businesses for the price of a subscription.
+A 200-person company runs finance with specialists costing £150k+/yr. Squeeze brings the same capability to small businesses for the price of a subscription.
 
-## 7. Revenue‑track coverage (hits both halves)
+## 7. Revenue insights
 
-The target track says "increase revenue **or** improve cash flow." Squeeze crushes cash flow; add **one insight card** for the revenue half:
-- *"BrightBuild is a high‑value repeat customer trending slower — protect this relationship,"* or
+Alongside cash-flow management, Squeeze surfaces revenue intelligence:
+
+- *"BrightBuild is a high-value repeat customer trending slower — protect this relationship."*
 - *"These 3 customers are your most reliable payers — win more like them."*
 
-## 8. Measurable outcomes (say these numbers on stage)
+## 8. Key metrics
 
-- £ gap identified → £ gap closed
-- DSO (days sales outstanding) reduced by *N* days
-- £ of float captured by re‑timing payables
-- £/yr recovered by procurement card
+- Cash gap identified → cash gap closed
+- DSO (days sales outstanding) reduced
+- Float captured by re-timing payables
+- Annual savings from procurement insights
 
-## 9. Out of scope for the hackathon
+## 9. Out of scope (v1)
 
-- Native mobile app (use mobile‑styled web + real WhatsApp/SMS).
-- Real financing marketplace integration (quotes are illustrative; name Satago/FundTap as production path).
-- Court filing (prep only).
-- Deep Treasury/Procurement agents (cards only).
+- Native mobile app (responsive web + WhatsApp/SMS for now).
+- Live financing marketplace integration (quotes are illustrative; Satago/FundTap as production path).
+- Court filing (document preparation only).
+- Full Treasury/Procurement agent automation (insight cards only).

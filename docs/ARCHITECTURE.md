@@ -1,28 +1,25 @@
 # Squeeze — Architecture
 
-Deliberately boring and demo‑safe. Optimised for a 48‑hour build with a flawless live demo, not for scale.
+A single Next.js application with a deterministic forecast core and an AI-assisted action layer. The arithmetic is pure code; the LLM handles language, explanation, and dialogue.
 
 ## System diagram
 
 ```
 ┌────────────────────────────┐        ┌───────────────────────────────┐
-│  Web UI (Next.js/React, TS) │ ─────► │  API / Orchestrator (Node)     │
-│  • Safe-to-Spend timeline   │  REST  │  • forecast engine (det.)      │
-│  • gap-cause invoice list   │        │  • decision/scoring logic      │
-│  • action cards (3 axes)    │ ◄───── │  • LLM tool-calling agent      │
-│  • Monday briefing + audio  │  SSE   │  • message/letter drafting     │
+│  Web UI (Next.js/React)    │ ─────► │  API layer (Next.js routes)    │
+│  • Safe-to-Spend timeline  │  REST  │  • forecast engine (det.)      │
+│  • gap-cause invoice list  │        │  • decision/scoring logic      │
+│  • action cards            │ ◄───── │  • copilot + tool-calling      │
+│  • Monday briefing         │  SSE   │  • message/letter drafting     │
 └────────────────────────────┘        └───────┬───────────────┬───────┘
                                                │               │
                         ┌──────────────────────┘               └──────────────────┐
                         ▼                                                          ▼
              ┌────────────────────┐                                   ┌──────────────────────┐
              │ Xero API           │                                   │ Twilio               │
-             │ • MCP server / REST│                                   │ • WhatsApp / SMS     │
-             │ • Accounting, Files│                                   │ • Voice (AI call)    │
-             │ • Webhooks ──┐     │                                   │ + TTS (ElevenLabs/   │
-             └──────────────┼─────┘                                   │   OpenAI) for call & │
-                            │                                         │   Monday briefing    │
-                   ngrok tunnel (dev)                                 └──────────────────────┘
+             │ • REST + webhooks  │                                   │ • WhatsApp / SMS     │
+             │ • OAuth 2.0        │                                   │ • Voice (AI call)    │
+             └──────────────┼─────┘                                   └──────────────────────┘
                             │
                    invoice/payment events → forecast heals
 ```
@@ -31,72 +28,72 @@ Deliberately boring and demo‑safe. Optimised for a 48‑hour build with a flaw
 
 | Layer | Choice | Notes |
 |---|---|---|
-| Frontend | Next.js + React + TypeScript, Tailwind | Mobile‑styled web; no native app |
-| Backend | Node.js (Next API routes or Express) | One service is fine for a hackathon |
-| AI orchestration | Claude or GPT with tool‑calling | Agent calls tools: `getForecast`, `rankGap`, `recommend`, `sendMessage`, `placeCall`, `draftLBA` |
-| Xero access | Official `@xeroapi/xero-mcp-server` + direct REST | REST for reports/webhooks not covered by MCP tools |
-| Voice/messaging | Twilio (WhatsApp sandbox, SMS, Voice) | Sandbox needs no approval for demo |
-| TTS | ElevenLabs or OpenAI TTS | AI call voice + 30‑sec Monday audio briefing |
-| STT (call replies) | Twilio speech / Whisper | Capture debtor responses |
-| Tunnel | ngrok | Xero + Twilio webhooks in dev |
-| Store | SQLite / Postgres (or in‑memory JSON) | Persist settings, action log, call transcripts |
-| Host | Vercel / Render | Whatever deploys fastest |
+| Frontend | Next.js 15 + React 19 + TypeScript, Tailwind | Responsive web dashboard |
+| Backend | Node.js via Next.js API routes + custom server (`server.ts`) | Single deployable service |
+| AI | OpenAI GPT-4o | Copilot, message drafting, call dialogue |
+| Xero | `xero-node` SDK + direct REST | OAuth 2.0, webhooks, payment recording |
+| Voice/messaging | Twilio (WhatsApp, SMS, Voice) | Outbound collections outreach |
+| TTS/STT | Twilio Gather + Polly | Speech-to-text on calls, text-to-speech replies |
+| Database | SQLite (`better-sqlite3`) | OAuth tokens, call sessions, action log |
+| Real-time | Server-Sent Events | Push forecast updates to the dashboard |
 
 ## Key components
 
-- **Forecast engine** (`/lib/forecast`) — deterministic cash curve + Safe‑to‑Spend (`DECISION_ENGINE.md` §A). No LLM.
-- **Decision engine** (`/lib/decision`) — risk score, action eligibility, 3‑axis ranking (§B/C).
-- **Xero client** (`/lib/xero`) — auth, pull invoices/contacts/bills/reports, write notes/expected dates/payments, attach files, verify webhooks (HMAC).
-- **Agent** (`/lib/agent`) — LLM tool‑calling: classifies replies, drafts messages/letters, explains recommendations, summarises calls.
-- **Comms** (`/lib/comms`) — Twilio send + call flow (TwiML), TTS.
-- **Seed** (`/scripts/seed.ts`) — populate demo Xero org (see `XERO_INTEGRATION.md` §Seed).
+- **Forecast engine** (`lib/forecast`) — behavioural payment dates, 14-day cash curve, Safe-to-Spend, gap detection. No LLM.
+- **Decision engine** (`lib/decision`) — customer risk score, action eligibility, speed/cost/risk ranking.
+- **Xero client** (`lib/xero`) — OAuth, invoice/contact/bill ingestion, payment recording, webhook verification (HMAC).
+- **Agent** (`lib/agent`) — copilot with tool-calling: explains forecasts, drafts messages, summarises calls.
+- **Comms** (`lib/comms`) — Twilio WhatsApp/SMS/voice, call state management, audit logging.
+- **Seed** (`scripts/seed.ts`) — populate a Xero org with realistic test data.
 
-## Data flow (happy path)
+## Data flow
 
-1. On load, backend pulls Xero → builds forecast → returns Safe‑to‑Spend + gap.
-2. UI shows gap; user opens an action card; agent explains + recommends.
-3. User approves → backend executes (Twilio/Xero write) → logs action.
-4. Debtor pays → Xero **payment webhook** → recompute forecast → push heal via SSE → UI animates.
+1. On connect, backend pulls Xero data and builds the 14-day forecast.
+2. Dashboard shows Safe-to-Spend, the gap, and ranked action cards.
+3. Owner approves an action; backend executes via Twilio or Xero write.
+4. Payment lands in Xero; webhook fires; forecast re-runs; SSE pushes the healed number to the UI.
 
-## Suggested repo layout
+## Repo layout
 
 ```
 squeeze/
-├─ README.md
-├─ docs/                      # these specs
-├─ app/ (or pages/)           # Next.js UI
-│  ├─ dashboard/              # Safe-to-Spend timeline + cards
-│  └─ briefing/               # Monday briefing (+ Treasury/Procurement cards)
-├─ lib/
-│  ├─ forecast/               # deterministic engine
-│  ├─ decision/               # scoring + ladder
-│  ├─ xero/                   # client + webhooks
-│  ├─ agent/                  # LLM tool-calling
-│  └─ comms/                  # Twilio + TTS
-├─ scripts/
-│  └─ seed.ts                 # seed demo Xero org
-└─ .env.example
+├── app/                    # Next.js pages and API routes
+│   ├── dashboard/          # Main dashboard
+│   └── api/                # Forecast, Xero, calls, webhooks, copilot
+├── components/             # UI components
+├── lib/
+│   ├── forecast/           # Deterministic forecast engine
+│   ├── decision/           # Scoring and escalation ladder
+│   ├── xero/               # Xero client, OAuth, webhooks
+│   ├── agent/              # Copilot and tool-calling
+│   ├── comms/              # Twilio voice, WhatsApp, SMS
+│   └── db/                 # SQLite schema and migrations
+├── scripts/                # Seed, auth, and smoke-test utilities
+├── docs/                   # Product and technical documentation
+└── .env.example
 ```
 
-## Environment variables (`.env.example`)
+## Environment variables
 
+See `.env.example` for the full list. Key variables:
+
+| Variable | Purpose |
+|---|---|
+| `XERO_CLIENT_ID` / `XERO_CLIENT_SECRET` | Xero app credentials |
+| `XERO_SCOPES` | Granular accounting scopes |
+| `XERO_WEBHOOK_KEY` | HMAC verification for webhooks |
+| `OPENAI_API_KEY` | Copilot and call dialogue |
+| `TWILIO_*` | WhatsApp, SMS, and voice |
+| `PUBLIC_BASE_URL` | HTTPS URL for webhooks (tunnel in dev) |
+| `SAFETY_BUFFER` | Default Safe-to-Spend floor (£) |
+
+## Development
+
+```bash
+npm install
+cp .env.example .env
+npm run db:migrate
+npm run dev
 ```
-XERO_CLIENT_ID=
-XERO_CLIENT_SECRET=
-XERO_SCOPES=accounting.invoices accounting.payments accounting.contacts accounting.settings offline_access
-XERO_WEBHOOK_KEY=
-LLM_API_KEY=
-TWILIO_ACCOUNT_SID=
-TWILIO_AUTH_TOKEN=
-TWILIO_WHATSAPP_FROM=
-TWILIO_VOICE_FROM=
-TTS_API_KEY=
-PUBLIC_BASE_URL=            # ngrok url for webhooks
-SAFETY_BUFFER=2000          # default Safe-to-Spend floor (£)
-```
 
-## Non‑negotiables for demo reliability
-
-- Forecast + heal must work **offline of live payment** (be able to fire a simulated payment webhook on cue).
-- Record a **backup video** of the AI call the moment it works.
-- Keep a "demo mode" toggle that uses seeded data so nothing depends on network luck on stage.
+For local webhook testing, expose the app via an HTTPS tunnel and set `PUBLIC_BASE_URL`.

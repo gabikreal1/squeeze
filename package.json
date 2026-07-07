@@ -1,7 +1,23 @@
 {
   "name": "squeeze",
   "version": "0.1.0",
+  "description": "AI credit controller for Xero — predict cash gaps, chase receivables, heal your forecast in real time.",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gabikreal1/squeeze.git"
+  },
+  "author": "gabikreal1",
+  "license": "UNLICENSED",
+  "keywords": [
+    "xero",
+    "cash-flow",
+    "accounts-receivable",
+    "collections",
+    "ai",
+    "fintech",
+    "small-business"
+  ],
   "scripts": {
     "dev": "tsx server.ts",
     "dev:clean": "rm -rf .next && tsx server.ts",

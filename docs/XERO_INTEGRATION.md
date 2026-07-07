@@ -1,17 +1,17 @@
 # Squeeze — Xero Integration
 
-Everything needed to make Xero the engine (and to answer the Checkpoint submission form).
+Squeeze connects to a Xero organisation and uses it as both the data source and the system of record for all collection actions.
 
 ## 1. App setup
 
-1. Sign in at `developer.xero.com` as an admin of the demo org.
-2. Create a **Custom Connection** (server‑to‑server, client credentials) — simplest for a hackathon and works with the MCP server. (Or a standard OAuth 2.0 app if you want the full auth‑code flow.)
-3. Select the granular scopes (see §3).
-4. Copy Client ID + Secret (secret shown once). Approve the connection from the email Xero sends.
+1. Sign in at [developer.xero.com](https://developer.xero.com/) as an admin of your organisation.
+2. Create a **Custom Connection** (server-to-server, client credentials) for development, or a standard **OAuth 2.0 Web App** for production user onboarding.
+3. Select the granular scopes listed in section 3.
+4. Copy the Client ID and Secret. For Custom Connections, approve the connection from the email Xero sends.
 
 ## 2. Access method
 
-Primary: official **Xero MCP server** for agent tool access.
+Squeeze uses the official **`xero-node`** SDK with direct REST calls to the Accounting API. An optional MCP server configuration is available for agent tooling during development:
 
 ```json
 {
@@ -29,11 +29,9 @@ Primary: official **Xero MCP server** for agent tool access.
 }
 ```
 
-Supplement with **direct REST** (`api.xero.com/api.xro/2.0/…`) for anything the MCP tools don't expose (reports, Files, webhooks).
+> **Scopes note:** Custom connections created after 29 April 2026 must use granular scopes. The broad `accounting.transactions` bundle fails with "Client credentials scope validation failed." Always set `XERO_SCOPES` explicitly.
 
-> ⚠️ **Scopes gotcha:** custom connections created **after 29 Apr 2026** must use *granular* scopes. The broad `accounting.transactions` bundle fails with "Client credentials scope validation failed." Always set `XERO_SCOPES` explicitly with the granular names below.
-
-## 3. OAuth 2.0 scopes required
+## 3. OAuth 2.0 scopes
 
 ```
 accounting.invoices              # read/write invoices (receivables + bills)
@@ -43,49 +41,40 @@ accounting.settings              # org, accounts, tax rates
 offline_access                   # refresh token (OAuth mode only)
 ```
 
-## 4. Endpoints used (for the "which endpoints" question)
+## 4. Endpoints
 
 | Endpoint | Method(s) | Purpose |
 |---|---|---|
-| `/Invoices` | GET, PUT | Pull receivables (`ACCREC`) + bills (`ACCPAY`) for the forecast; seed demo invoices |
+| `/Invoices` | GET, PUT | Pull receivables (`ACCREC`) and bills (`ACCPAY`) for the forecast |
 | `/Invoices/{InvoiceID}` | GET | Fetch a single invoice with its payments |
-| `/Payments` | PUT | Record a payment against a receivable (pay‑down action) |
-| `/Payments/{PaymentID}` | GET, POST (Status=DELETED) | Payment lookup; reverse a payment to reset the demo |
-| `/Contacts` | GET, PUT, POST | Customer details + history; seed/update demo contacts |
-| `/Accounts` | GET, PUT | Bank balances for cash position; create demo bank account |
-| `/Organisation` | GET | Connection check / org details |
-| `/TaxRates` | GET | Tax setup (demo seeding) |
-| Webhooks | (subscribe) | Real‑time Invoice + Payment events → forecast heals |
+| `/Payments` | PUT | Record a payment against a receivable |
+| `/Payments/{PaymentID}` | GET, POST (Status=DELETED) | Payment lookup; reverse a payment |
+| `/Contacts` | GET, PUT, POST | Customer details and payment history |
+| `/Accounts` | GET | Bank balances for cash position |
+| `/Organisation` | GET | Connection check and org details |
+| `/TaxRates` | GET | Tax setup |
+| Webhooks | (subscribe) | Real-time Invoice and Payment events |
 
 ## 5. Webhooks
 
-- Subscribe to **Invoice** and **Payment** events in the developer portal; point to `PUBLIC_BASE_URL/webhooks/xero` (ngrok in dev).
-- Verify the `x-xero-signature` HMAC‑SHA256 against `XERO_WEBHOOK_KEY`; respond 200 fast, process async.
-- Say "webhook‑driven" on stage — the Xero pitch playbook explicitly rewards it.
-- **Fallback:** if the payment webhook is unavailable at the venue, poll `/Payments` and use the invoice‑update webhook; you can still fire a simulated event to trigger the on‑stage heal.
+- Subscribe to **Invoice** and **Payment** events in the Xero developer portal.
+- Point the webhook URL to `PUBLIC_BASE_URL/api/webhooks/xero`.
+- Verify the `x-xero-signature` HMAC-SHA256 header against `XERO_WEBHOOK_KEY`.
+- Respond with 200 immediately; process events asynchronously.
+- On payment, re-run the forecast and push the update to the dashboard via SSE.
 
-## 6. Seed data (the demo IS the data)
+For local development, use an HTTPS tunnel (e.g. ngrok) and set `PUBLIC_BASE_URL` to the tunnel URL.
 
-Run `scripts/seed.ts` against the demo org first. Create ~15 contacts with distinct personalities and **6–12 months of backdated invoices + payments** so behavioural averages are real.
+## 6. Seed data
 
-| Contact | Personality | Demo role |
+Run `npm run seed` to populate a Xero org with realistic test data. The seed script creates contacts with distinct payment personalities and 6–12 months of backdated invoices and payments so behavioural averages are meaningful.
+
+| Contact | Personality | Role in testing |
 |---|---|---|
-| Patel Catering | Always pays ~8 days late, 14 clean invoices | LOW risk → "don't squeeze", soft nudge |
-| BrightBuild Ltd | First‑time, no history, £2,400, 17d overdue, ignored 2 emails | HIGH risk → AI call → LBA |
-| Henderson & Co | Reliable, offers 2%/10 early‑pay | TREASURY discount opportunity |
-| Newline Studio | Medium, slow, large balance | FINANCING candidate |
-| Riverside Hotel | Big recurring client, slightly slow | High‑value → protect relationship (revenue card) |
-| + ~10 others | Mixed timings | Forecast realism |
+| Patel Catering | Always pays ~8 days late, reliable | Low risk — soft nudge only |
+| BrightBuild Ltd | First-time, £2,400, 17 days overdue | High risk — firm escalation |
+| Henderson & Co | Reliable, offers early-pay discount | Treasury opportunity |
+| Newline Studio | Medium, slow, large balance | Financing candidate |
+| Riverside Hotel | Big recurring client, slightly slow | High-value relationship |
 
-Also seed: payroll run + a supplier bill + a VAT set‑aside in the next 14 days so a **real gap** exists on `low_day`. Keep one invoice ready to mark paid live (or fire a simulated payment webhook) to heal the forecast on cue.
-
-## 7. Checkpoint submission — paste‑ready answers
-
-**How did your project utilize the Xero API?**
-> Squeeze is an AI credit controller built on Xero. It reads receivables, payables and payment history from Xero to forecast the exact day cash runs short, identifies the invoices causing the gap, then takes graduated collection actions (reminder → AI call → discount → financing → Letter Before Action) and writes every action, note and expected‑payment date back into Xero. Xero is both source of truth and system of record; we use webhooks so payments update the forecast in real time.
-
-**Development platform:** Next.js/React (TypeScript), Node.js; LLM tool‑calling via [Claude/GPT]; Xero via the official MCP server + REST; Twilio for WhatsApp/SMS + the live AI voice call; [ElevenLabs/OpenAI] TTS; ngrok for webhooks; hosted on [Vercel/Render].
-
-**Endpoints:** see §4 (list only what you actually ship).
-
-**Scopes:** see §3 — "we used granular v2 scopes since our custom connection was created after 29 Apr 2026."
+The seed also includes payroll, supplier bills, and VAT set-asides in the next 14 days so a real cash gap appears in the forecast.
